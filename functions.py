@@ -12,30 +12,12 @@ Removes estructures from input image
 def removeThings(input_img):
     print 'Clean Image'
     img = input_img.copy()
-    roi = [1, 526, 2, 703]
-    cropped = img[1:526, 2:703]
-    cropped[478:518, 658:696] = 0
-    c1 = [255, 255, 255]
-    c2 = [0, 255, 255]
-    matches_not = np.logical_not(np.logical_or(np.all(cropped == c1, -1), np.all(cropped == c2, -1)))
-    matches = (np.logical_or(np.all(cropped == c1, -1), np.all(cropped == c2, -1)))
 
-
-    cropped[:, :, 0] = cropped[:, :, 0] * matches_not.astype(int)
-    cropped[:, :, 1] = cropped[:, :, 1] * matches_not.astype(int)
-    cropped[:, :, 2] = cropped[:, :, 2] * matches_not.astype(int)
-
-    kernel = np.ones((9, 9), np.float32) / 81
-
-    # filtered = cv2.filter2D(cropped, -1, kernel)
-    filtered = cv2.medianBlur(cropped, 9)
-    filtered[:, :, 0] = filtered[:, :, 0] * matches
-    filtered[:, :, 1] = filtered[:, :, 1] * matches
-    filtered[:, :, 2] = filtered[:, :, 2] * matches
-
-    out = cropped + filtered
+    c1 = 0
+    c2 = 52
+    img[np.where((img == [0, 0, 0]).all(axis=2))] = [c2, c2, c2]
     print 'Clean done'
-    return out
+    return img
 
 '''
 Removes the center estructure from a bw image

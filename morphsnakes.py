@@ -23,7 +23,9 @@ Morphological Active Contours without Edges, respectively. See the
 aforementioned paper for full details.
 
 See test.py for examples of usage.
+Modified by Luis F. Llamas Luaces on March 2017
 """
+
 
 __author__ = "P. Márquez Neila <p.mneila@upm.es>"
 
@@ -113,6 +115,80 @@ def gborders(img, alpha=1.0, sigma=1.0):
 def glines(img, sigma=1.0):
     """Stopping criterion for image black lines."""
     return gaussian_filter(img, sigma)
+
+
+class MorphACWE(object):
+    """Morphological ACWE based on the Chan-Vese energy functional."""
+
+    def __init__(self, data, smoothing=1, lambda1=1, lambda2=1):
+        """Create a Morphological ACWE solver.
+
+        Parameters
+        ----------
+        data : ndarray
+            The image data.
+        smoothing : scalar
+            The number of repetitions of the smoothing step (the
+            curv operator) in each iteration. In other terms,
+            this is the strength of the smoothing. This is the
+            parameter µ.
+        lambda1, lambda2 : scalars
+            Relative importance of the inside pixels (lambda1)
+            against the outside pixels (lambda2).
+        """
+        self._u = None
+        self.smoothing = smoothing
+        self.lambda1 = lambda1
+        self.lambda2 = lambda2
+
+        self.data = data
+
+    def set_levelset(self, u):
+        self._u = np.double(u)
+        self._u[u > 0] = 1
+        self._u[u <= 0] = 0
+
+    levelset = property(lambda self: self._u,
+                        set_levelset,
+                        doc="The level set embedding function (u).")
+
+    def step(self):
+        """Perform a single step of the morphological Chan-Vese evolution."""
+        # Assign attributes to local variables for convenience.
+        u = self._u
+
+        if u is None:
+            raise ValueError("the levelset function is not set (use set_levelset)")
+
+        data = self.data
+
+        # Determine c0 and c1.
+        inside = u > 0
+        outside = u <= 0
+        c0 = data[outside].sum() / float(outside.sum())
+        c1 = data[inside].sum() / float(inside.sum())
+
+        # Image attachment.
+        dres = np.array(np.gradient(u))
+        abs_dres = np.abs(dres).sum(0)
+        # aux = abs_dres * (c0 - c1) * (c0 + c1 - 2*data)
+        aux = abs_dres * (self.lambda1 * (data - c1) ** 2 - self.lambda2 * (data - c0) ** 2)
+
+        res = np.copy(u)
+        res[aux < 0] = 1
+        res[aux > 0] = 0
+
+        # Smoothing.
+        for i in range(self.smoothing):
+            res = curvop(res)
+
+        self._u = res
+
+    def run(self, iterations):
+        """Run several iterations of the morphological Chan-Vese method."""
+        for i in range(iterations):
+            self.step()
+
 
 
 class MorphGAC(object):
@@ -254,6 +330,8 @@ def evolve(msnake, levelset=None, num_iters=20, animate = False, background = No
 
     # Iterate.
     print bcolors.WARNING+ 'Evolving, iterations: '+str(num_iters)+bcolors.ENDC
+    last = None
+    count = 0;
     for i in range(num_iters):
         # Evolve.
         msnake.step()
@@ -264,6 +342,9 @@ def evolve(msnake, levelset=None, num_iters=20, animate = False, background = No
 
                 if background is not None:
                     snek = msnake.levelset
+
+
+
                     kernel = np.ones((3,3))
                     erosion = cv2.erode(snek, kernel)
 
@@ -271,6 +352,19 @@ def evolve(msnake, levelset=None, num_iters=20, animate = False, background = No
                     cv2.putText(edges, 'Evolving, iteration: '+str(i+1), (20, 20),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.5, 255, 1)
                     cv2.imshow("window", cv2.addWeighted(background,0.7,edges,0.3,0.0))
+
+                    if last is not None:
+                        if np.count_nonzero(last)>np.count_nonzero(snek)-15:
+                            count = count + 1
+                            print count
+                            if count == 3:
+                                edges = (snek - erosion).astype(np.uint8) * 255
+                                print "Stopped at iteration "+str(i)
+                                return (msnake.levelset).astype(np.uint8) * 255, edges
+                        else:
+                            count = 0
+
+                    last = snek
 
                 else:
 
