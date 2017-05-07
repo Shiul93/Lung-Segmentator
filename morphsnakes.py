@@ -356,7 +356,6 @@ def evolve(msnake, levelset=None, num_iters=20, animate = False, background = No
                     if last is not None:
                         if np.count_nonzero(last)>np.count_nonzero(snek)-15:
                             count = count + 1
-                            print count
                             if count == 3:
                                 edges = (snek - erosion).astype(np.uint8) * 255
                                 print "Stopped at iteration "+str(i)
